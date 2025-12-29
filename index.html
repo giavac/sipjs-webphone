@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIP.js Registration with Incoming Calls</title>
+    <script src="https://cdn.jsdelivr.net/npm/sip.js/dist/sip.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .section {
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            background-color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .section h2 {
+            margin-top: 0;
+            color: #333;
+            font-size: 1.2em;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+        .form-row {
+            display: flex;
+            gap: 15px;
+        }
+        .form-row .form-group {
+            flex: 1;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        button {
+            padding: 12px 20px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        button.danger {
+            background-color: #f44336;
+        }
+        button.danger:hover {
+            background-color: #d32f2f;
+        }
+        button.secondary {
+            background-color: #2196F3;
+        }
+        button.secondary:hover {
+            background-color: #1976D2;
+        }
+        input, select {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        input:focus {
+            outline: none;
+            border-color: #2196F3;
+        }
+        label {
+            font-weight: 500;
+            color: #555;
+        }
+        #status {
+            padding: 12px;
+            border-radius: 4px;
+            background-color: #f5f5f5;
+            min-height: 20px;
+            font-size: 14px;
+        }
+        #registrationStatus {
+            padding: 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            text-align: center;
+        }
+        .registered {
+            background-color: #c8e6c9;
+            color: #2e7d32;
+        }
+        .unregistered {
+            background-color: #ffcdd2;
+            color: #c62828;
+        }
+        .registering {
+            background-color: #fff9c4;
+            color: #f57f17;
+        }
+        #log {
+            background-color: #263238;
+            color: #aed581;
+            padding: 12px;
+            border-radius: 4px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        #remoteAudio {
+            margin-top: 15px;
+            width: 100%;
+        }
+        
+        /* Incoming Call Overlay - FIXED */
+        #incomingCallOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+        #incomingCallOverlay.active {
+            display: flex !important;
+        }
+        .incoming-call-modal {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            color: white;
+            min-width: 350px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+        .incoming-call-modal h2 {
+            margin: 0 0 10px 0;
+            font-size: 24px;
+            border: none;
+            padding: 0;
+        }
+        .incoming-call-modal .caller-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+        }
+        .incoming-call-modal .caller-info {
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            word-break: break-all;
+        }
+        .incoming-call-modal .caller-uri {
+            font-size: 14px;
+            opacity: 0.8;
+            margin-bottom: 30px;
+            word-break: break-all;
+        }
+        .incoming-call-modal .call-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+        }
+        .call-btn {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            font-size: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        .call-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+        }
+        .answer-btn {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .reject-btn {
+            background-color: #f44336;
+            color: white;
+        }
+        
+        /* Active Call Display */
+        #activeCall {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            padding: 20px;
+            border-radius: 12px;
+            color: white;
+            display: none;
+            margin-bottom: 15px;
+        }
+        #activeCall.visible {
+            display: block;
+        }
+        .call-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .call-icon {
+            font-size: 40px;
+        }
+        .call-details h3 {
+            margin: 0;
+            font-size: 18px;
+        }
+        .call-details p {
+            margin: 5px 0 0 0;
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        .call-timer {
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        .call-actions {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .call-actions button {
+            padding: 10px 25px;
+        }
+        
+        /* DTMF Keypad */
+        .dtmf-keypad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            max-width: 200px;
+            margin: 15px auto;
+        }
+        .dtmf-keypad button {
+            padding: 15px;
+            font-size: 20px;
+            background-color: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        .dtmf-keypad button:hover {
+            background-color: rgba(255,255,255,0.3);
+        }
+
+        /* Checkbox styling */
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .checkbox-group input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+        }
+    </style>
+</head>
+<body>
+    <h1>📞 SIP.js Registration & Calling</h1>
+
+    <!-- Incoming Call Overlay - MOVED TO TOP OF BODY -->
+    <div id="incomingCallOverlay">
+        <div class="incoming-call-modal">
+            <div class="caller-icon">📲</div>
+            <h2>Incoming Call</h2>
+            <div class="caller-info" id="callerDisplayName">Unknown Caller</div>
+            <div class="caller-uri" id="callerUri">sip:unknown@unknown</div>
+            <div class="call-buttons">
+                <button class="call-btn reject-btn" id="rejectButton" title="Reject">✕</button>
+                <button class="call-btn answer-btn" id="answerButton" title="Answer">✓</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Active Call Display -->
+        <div id="activeCall">
+            <div class="call-info">
+                <span class="call-icon">📞</span>
+                <div class="call-details">
+                    <h3 id="activeCallParty">Connected</h3>
+                    <p id="activeCallDirection">Incoming Call</p>
+                </div>
+            </div>
+            <div class="call-timer" id="callTimer">00:00</div>
+            <div class="dtmf-keypad" id="dtmfKeypad">
+                <button onclick="sendDTMF('1')">1</button>
+                <button onclick="sendDTMF('2')">2</button>
+                <button onclick="sendDTMF('3')">3</button>
+                <button onclick="sendDTMF('4')">4</button>
+                <button onclick="sendDTMF('5')">5</button>
+                <button onclick="sendDTMF('6')">6</button>
+                <button onclick="sendDTMF('7')">7</button>
+                <button onclick="sendDTMF('8')">8</button>
+                <button onclick="sendDTMF('9')">9</button>
+                <button onclick="sendDTMF('*')">*</button>
+                <button onclick="sendDTMF('0')">0</button>
+                <button onclick="sendDTMF('#')">#</button>
+            </div>
+            <div class="call-actions">
+                <button id="muteButton" class="secondary" onclick="toggleMute()">🔇 Mute</button>
+                <button id="holdButton" class="secondary" onclick="toggleHold()">⏸️ Hold</button>
+                <button id="activeHangupButton" class="danger" onclick="hangUp()">📵 End Call</button>
+            </div>
+        </div>
+
+        <!-- Registration Settings -->
+        <div class="section">
+            <h2>🔐 Registration Settings</h2>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="sipServer">SIP Server WebSocket URL:</label>
+                    <input type="text" id="sipServer" placeholder="wss://sip.example.com" value="">
+                </div>
+                <div class="form-group">
+                    <label for="sipDomain">SIP Domain:</label>
+                    <input type="text" id="sipDomain" placeholder="example.com" value="">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="sipUsername">SIP Username:</label>
+                    <input type="text" id="sipUsername" placeholder="username" value="">
+                </div>
+                <div class="form-group">
+                    <label for="sipPassword">SIP Password:</label>
+                    <input type="password" id="sipPassword" placeholder="password" value="">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="displayName">Display Name (optional):</label>
+                <input type="text" id="displayName" placeholder="John Doe" value="">
+            </div>
+        </div>
+
+        <!-- ICE Settings -->
+        <div class="section">
+            <h2>🌐 ICE/TURN Settings</h2>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="stunServer">STUN Server:</label>
+                    <input type="text" id="stunServer" placeholder="stun:stun.l.google.com:19302" value="stun:stun.l.google.com:19302">
+                </div>
+                <div class="form-group">
+                    <label for="turnServer">TURN Server:</label>
+                    <input type="text" id="turnServer" placeholder="turn:turn.example.com:3478" value="">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="turnUsername">TURN Username:</label>
+                    <input type="text" id="turnUsername" placeholder="username" value="">
+                </div>
+                <div class="form-group">
+                    <label for="turnCredential">TURN Credential:</label>
+                    <input type="password" id="turnCredential" placeholder="password" value="">
+                </div>
+            </div>
+        </div>
+
+        <!-- Registration Controls -->
+        <div class="section">
+            <h2>📋 Registration Status</h2>
+            <div class="form-group">
+                <div id="registrationStatus" class="unregistered">Not Registered</div>
+            </div>
+            <div class="controls">
+                <button id="registerButton">Register</button>
+                <button id="unregisterButton" class="danger" disabled>Unregister</button>
+            </div>
+            <div class="form-group" style="margin-top: 15px;">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="autoAnswer">
+                    <label for="autoAnswer">Auto-answer incoming calls</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Outgoing Call -->
+        <div class="section">
+            <h2>📤 Make a Call</h2>
+            <div class="form-group">
+                <label for="callTarget">SIP URI to call:</label>
+                <input type="text" id="callTarget" placeholder="sip:user@domain.com" value="">
+            </div>
+            <div class="controls">
+                <button id="callButton" class="secondary" disabled>📞 Call</button>
+                <button id="hangupButton" class="danger" disabled>📵 Hang Up</button>
+            </div>
+        </div>
+
+        <!-- Status -->
+        <div class="section">
+            <h2>ℹ️ Status</h2>
+            <div id="status">Ready to connect...</div>
+        </div>
+
+        <!-- Log -->
+        <div class="section">
+            <h2>📜 Event Log</h2>
+            <div id="log"></div>
+            <button onclick="document.getElementById('log').innerHTML=''" style="margin-top:10px; background-color:#607D8B;">Clear Log</button>
+        </div>
+    </div>
+
+    <audio id="remoteAudio" autoplay></audio>
+
+    <script>
+        // Global variables
+        let userAgent = null;
+        let registerer = null;
+        let currentSession = null;
+        let incomingSession = null;
+        let isMuted = false;
+        let isOnHold = false;
+        let callTimerInterval = null;
+        let callStartTime = null;
+        let ringtoneInterval = null;
+        let audioContext = null;
+
+        window.addEventListener('load', () => {
+            // Verify SIP.js is loaded
+            if (typeof window.SIP === 'undefined') {
+                document.getElementById('status').textContent = 'Error: SIP.js library failed to load';
+                console.error('SIP.js not loaded!');
+                return;
+            }
+
+            console.log('SIP.js loaded successfully:', SIP.version || 'version unknown');
+
+            // DOM Elements
+            const registerButton = document.getElementById('registerButton');
+            const unregisterButton = document.getElementById('unregisterButton');
+            const callButton = document.getElementById('callButton');
+            const hangupButton = document.getElementById('hangupButton');
+            const answerButton = document.getElementById('answerButton');
+            const rejectButton = document.getElementById('rejectButton');
+            const statusDiv = document.getElementById('status');
+            const registrationStatusDiv = document.getElementById('registrationStatus');
+            const logDiv = document.getElementById('log');
+            const incomingCallOverlay = document.getElementById('incomingCallOverlay');
+            const callerDisplayName = document.getElementById('callerDisplayName');
+            const callerUri = document.getElementById('callerUri');
+            const remoteAudio = document.getElementById('remoteAudio');
+            const activeCallDiv = document.getElementById('activeCall');
+            const autoAnswerCheckbox = document.getElementById('autoAnswer');
+
+            // Verify critical elements exist
+            console.log('Checking DOM elements...');
+            console.log('incomingCallOverlay:', incomingCallOverlay);
+            console.log('answerButton:', answerButton);
+            console.log('rejectButton:', rejectButton);
+
+            // Event Listeners
+            registerButton.addEventListener('click', register);
+            unregisterButton.addEventListener('click', unregister);
+            callButton.addEventListener('click', makeCall);
+            hangupButton.addEventListener('click', () => hangUp());
+            
+            // CRITICAL: Attach answer/reject handlers
+            answerButton.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Answer button clicked!');
+                answerCall();
+            });
+            
+            rejectButton.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Reject button clicked!');
+                rejectCall();
+            });
+
+            function log(message, type = 'info') {
+                const timestamp = new Date().toLocaleTimeString();
+                const colors = {
+                    'info': '#aed581',
+                    'error': '#ef5350',
+                    'success': '#4caf50',
+                    'warning': '#ffb74d',
+                    'incoming': '#64b5f6'
+                };
+                const color = colors[type] || colors.info;
+                logDiv.innerHTML += `<span style="color:${color}">[${timestamp}] ${message}</span><br>`;
+                logDiv.scrollTop = logDiv.scrollHeight;
+                console.log(`[${type.toUpperCase()}] ${message}`);
+            }
+
+            function updateStatus(message) {
+                statusDiv.textContent = message;
+                log(message);
+            }
+
+            function updateRegistrationStatus(state) {
+                registrationStatusDiv.className = state;
+                switch(state) {
+                    case 'registered':
+                        registrationStatusDiv.textContent = '✓ Registered';
+                        registerButton.disabled = true;
+                        unregisterButton.disabled = false;
+                        callButton.disabled = false;
+                        break;
+                    case 'unregistered':
+                        registrationStatusDiv.textContent = '✗ Not Registered';
+                        registerButton.disabled = false;
+                        unregisterButton.disabled = true;
+                        callButton.disabled = true;
+                        break;
+                    case 'registering':
+                        registrationStatusDiv.textContent = '⏳ Registering...';
+                        registerButton.disabled = true;
+                        unregisterButton.disabled = true;
+                        break;
+                }
+            }
+
+            function getIceServers() {
+                const stunServer = document.getElementById('stunServer').value;
+                const turnServer = document.getElementById('turnServer').value;
+                const turnUsername = document.getElementById('turnUsername').value;
+                const turnCredential = document.getElementById('turnCredential').value;
+
+                const iceServers = [];
+
+                if (stunServer && stunServer.trim() !== '') {
+                    iceServers.push({ urls: stunServer });
+                }
+
+                if (turnServer && turnServer.trim() !== '') {
+                    iceServers.push({
+                        urls: turnServer,
+                        username: turnUsername || '',
+                        credential: turnCredential || ''
+                    });
+                }
+
+                if (iceServers.length === 0) {
+                    iceServers.push({ urls: 'stun:stun.l.google.com:19302' });
+                }
+
+                log('ICE Servers configured: ' + iceServers.length);
+                return iceServers;
+            }
+
+            // Ringtone functions
+            function playRingtone() {
+                try {
+                    if (!audioContext) {
+                        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    }
+                    
+                    function playTone() {
+                        if (audioContext.state === 'suspended') {
+                            audioContext.resume();
+                        }
+                        
+                        const oscillator = audioContext.createOscillator();
+                        const gainNode = audioContext.createGain();
+                        
+                        oscillator.connect(gainNode);
+                        gainNode.connect(audioContext.destination);
+                        
+                        oscillator.frequency.value = 440;
+                        oscillator.type = 'sine';
+                        
+                        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                        
+                        oscillator.start(audioContext.currentTime);
+                        oscillator.stop(audioContext.currentTime + 0.5);
+                    }
+                    
+                    playTone();
+                    ringtoneInterval = setInterval(() => {
+                        if (incomingCallOverlay.classList.contains('active')) {
+                            playTone();
+                        } else {
+                            stopRingtone();
+                        }
+                    }, 1000);
+                    
+                } catch (e) {
+                    log('Could not play ringtone: ' + e.message, 'warning');
+                }
+            }
+
+            function stopRingtone() {
+                if (ringtoneInterval) {
+                    clearInterval(ringtoneInterval);
+                    ringtoneInterval = null;
+                }
+            }
+
+            // ==========================================
+            // SHOW/HIDE INCOMING CALL UI
+            // ==========================================
+            function showIncomingCall() {
+                console.log('>>> showIncomingCall() called');
+                console.log('>>> incomingCallOverlay element:', incomingCallOverlay);
+                
+                incomingCallOverlay.style.display = 'flex';
+                incomingCallOverlay.classList.add('active');
+                
+                console.log('>>> After adding active class:', incomingCallOverlay.className);
+                console.log('>>> Display style:', incomingCallOverlay.style.display);
+                console.log('>>> Computed display:', window.getComputedStyle(incomingCallOverlay).display);
+                
+                log('Showing incoming call UI', 'incoming');
+            }
+
+            function hideIncomingCall() {
+                console.log('>>> hideIncomingCall() called');
+                incomingCallOverlay.style.display = 'none';
+                incomingCallOverlay.classList.remove('active');
+                stopRingtone();
+                log('Hiding incoming call UI');
+            }
+
+            function showActiveCall(party, direction) {
+                document.getElementById('activeCallParty').textContent = party;
+                document.getElementById('activeCallDirection').textContent = direction;
+                activeCallDiv.classList.add('visible');
+                activeCallDiv.style.display = 'block';
+                hangupButton.disabled = false;
+                callButton.disabled = true;
+            }
+
+            function hideActiveCall() {
+                activeCallDiv.classList.remove('visible');
+                activeCallDiv.style.display = 'none';
+                hangupButton.disabled = true;
+                callButton.disabled = false;
+                isMuted = false;
+                isOnHold = false;
+                document.getElementById('muteButton').textContent = '🔇 Mute';
+                document.getElementById('holdButton').textContent = '⏸️ Hold';
+            }
+
+            // ==========================================
+            // REGISTRATION
+            // ==========================================
+            async function register() {
+                try {
+                    const sipServer = document.getElementById('sipServer').value;
+                    const sipDomain = document.getElementById('sipDomain').value;
+                    const sipUsername = document.getElementById('sipUsername').value;
+                    const sipPassword = document.getElementById('sipPassword').value;
+                    const displayName = document.getElementById('displayName').value;
+
+                    if (!sipServer || !sipDomain || !sipUsername) {
+                        updateStatus('Please fill in all required fields');
+                        return;
+                    }
+
+                    updateRegistrationStatus('registering');
+                    updateStatus('Connecting to SIP server...');
+
+                    const sipUri = `sip:${sipUsername}@${sipDomain}`;
+                    const uri = SIP.UserAgent.makeURI(sipUri);
+
+                    if (!uri) {
+                        updateStatus('Invalid SIP URI');
+                        updateRegistrationStatus('unregistered');
+                        return;
+                    }
+
+                    const iceServers = getIceServers();
+
+                    // Create UserAgent
+                    userAgent = new SIP.UserAgent({
+                        uri: uri,
+                        displayName: displayName || sipUsername,
+                        authorizationUsername: sipUsername,
+                        authorizationPassword: sipPassword,
+                        transportOptions: {
+                            server: sipServer,
+                            traceSip: true
+                        },
+                        sessionDescriptionHandlerFactoryOptions: {
+                            peerConnectionConfiguration: {
+                                iceServers: iceServers
+                            }
+                        },
+                        delegate: {
+                            onConnect: () => {
+                                log('WebSocket transport connected', 'success');
+                            },
+                            onDisconnect: (error) => {
+                                log('Transport disconnected' + (error ? ': ' + error.message : ''), 'error');
+                                updateRegistrationStatus('unregistered');
+                                updateStatus('Disconnected from server');
+                            },
+                            // ==========================================
+                            // THIS IS THE INCOMING CALL HANDLER
+                            // ==========================================
+                            onInvite: (invitation) => {
+                                console.log('========================================');
+                                console.log('onInvite TRIGGERED!');
+                                console.log('invitation object:', invitation);
+                                console.log('========================================');
+                                handleIncomingCall(invitation);
+                            }
+                        }
+                    });
+
+                    await userAgent.start();
+                    log('UserAgent started', 'success');
+
+                    // Create Registerer
+                    registerer = new SIP.Registerer(userAgent, {
+                        expires: 300,
+                        refreshFrequency: 90
+                    });
+
+                    registerer.stateChange.addListener((state) => {
+                        log('Registration state changed: ' + state);
+                        switch (state) {
+                            case SIP.RegistererState.Registered:
+                                updateRegistrationStatus('registered');
+                                updateStatus('Successfully registered - Ready to receive calls');
+                                break;
+                            case SIP.RegistererState.Unregistered:
+                                updateRegistrationStatus('unregistered');
+                                updateStatus('Unregistered');
+                                break;
+                            case SIP.RegistererState.Terminated:
+                                updateRegistrationStatus('unregistered');
+                                updateStatus('Registration terminated');
+                                break;
+                        }
+                    });
+
+                    await registerer.register({
+                        requestDelegate: {
+                            onAccept: (response) => {
+                                log('REGISTER accepted: ' + response.message.statusCode, 'success');
+                            },
+                            onReject: (response) => {
+                                log('REGISTER rejected: ' + response.message.statusCode + ' ' + response.message.reasonPhrase, 'error');
+                                updateStatus('Registration failed: ' + response.message.reasonPhrase);
+                                updateRegistrationStatus('unregistered');
+                            }
+                        }
+                    });
+
+                } catch (error) {
+                    log('Registration error: ' + error.message, 'error');
+                    updateStatus('Registration failed: ' + error.message);
+                    updateRegistrationStatus('unregistered');
+                }
+            }
+
+            async function unregister() {
+                try {
+                    hideActiveCall();
+                    hideIncomingCall();
+                    
+                    if (registerer) {
+                        updateStatus('Unregistering...');
+                        await registerer.unregister();
+                        log('Unregister request sent');
+                    }
+
+                    if (userAgent) {
+                        await userAgent.stop();
+                        userAgent = null;
+                        registerer = null;
+                    }
+
+                    updateRegistrationStatus('unregistered');
+                    updateStatus('Unregistered successfully');
+
+                } catch (error) {
+                    log('Error during unregister: ' + error.message, 'error');
+                }
+            }
+
+            // ==========================================
+            // INCOMING CALL HANDLING
+            // ==========================================
+            function handleIncomingCall(invitation) {
+                console.log('handleIncomingCall() called with:', invitation);
+                
+                log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'incoming');
+                log('📲 INCOMING CALL RECEIVED', 'incoming');
+                log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'incoming');
+                
+                // Store the session
+                incomingSession = invitation;
+                currentSession = invitation;
+
+                // Extract caller information
+                const remoteIdentity = invitation.remoteIdentity;
+                const displayNameVal = remoteIdentity.displayName || 'Unknown';
+                const uriVal = remoteIdentity.uri.toString();
+                
+                log('From: ' + displayNameVal, 'incoming');
+                log('URI: ' + uriVal, 'incoming');
+                
+                // Log INVITE details
+                if (invitation.request) {
+                    log('Call-ID: ' + invitation.request.callId, 'incoming');
+                    const fromHeader = invitation.request.getHeader('From');
+                    const toHeader = invitation.request.getHeader('To');
+                    if (fromHeader) log('From Header: ' + fromHeader, 'incoming');
+                    if (toHeader) log('To Header: ' + toHeader, 'incoming');
+                }
+
+                // Update UI elements
+                callerDisplayName.textContent = displayNameVal;
+                callerUri.textContent = uriVal;
+
+                // Set up session state change handler
+                invitation.stateChange.addListener((state) => {
+                    log('Incoming session state: ' + state);
+                    
+                    switch (state) {
+                        case SIP.SessionState.Initial:
+                            log('Session initialized');
+                            break;
+                        case SIP.SessionState.Establishing:
+                            log('Session establishing...');
+                            break;
+                        case SIP.SessionState.Established:
+                            log('Session established - Call connected!', 'success');
+                            hideIncomingCall();
+                            showActiveCall(displayNameVal, 'Incoming Call');
+                            setupRemoteMedia(invitation);
+                            startCallTimer();
+                            break;
+                        case SIP.SessionState.Terminating:
+                            log('Session terminating...');
+                            break;
+                        case SIP.SessionState.Terminated:
+                            log('Session terminated', 'warning');
+                            hideIncomingCall();
+                            hideActiveCall();
+                            stopCallTimer();
+                            cleanupMedia();
+                            currentSession = null;
+                            incomingSession = null;
+                            updateStatus('Call ended');
+                            break;
+                    }
+                });
+
+                // Handle call events via delegate
+                invitation.delegate = {
+                    onCancel: (cancel) => {
+                        log('Incoming call was cancelled by caller', 'warning');
+                        hideIncomingCall();
+                        updateStatus('Call cancelled by caller');
+                        currentSession = null;
+                        incomingSession = null;
+                    },
+                    onBye: (bye) => {
+                        log('Received BYE - Call ended by remote party', 'warning');
+                        hideActiveCall();
+                        stopCallTimer();
+                        cleanupMedia();
+                    }
+                };
+
+                // Check for auto-answer
+                if (autoAnswerCheckbox.checked) {
+                    log('Auto-answer enabled - answering automatically', 'success');
+                    setTimeout(() => answerCall(), 500);
+                } else {
+                    // Show incoming call UI
+                    console.log('About to show incoming call UI...');
+                    showIncomingCall();
+                    playRingtone();
+                }
+
+                updateStatus('Incoming call from ' + displayNameVal);
+            }
+
+            // ==========================================
+            // ANSWER CALL
+            // ==========================================
+            async function answerCall() {
+                console.log('answerCall() called');
+                console.log('incomingSession:', incomingSession);
+                
+                if (!incomingSession) {
+                    log('No incoming session to answer', 'error');
+                    return;
+                }
+
+                try {
+                    log('Answering incoming call...', 'success');
+                    hideIncomingCall();
+
+                    const iceServers = getIceServers();
+
+                    const options = {
+                        sessionDescriptionHandlerOptions: {
+                            constraints: { 
+                                audio: true, 
+                                video: false 
+                            },
+                            peerConnectionConfiguration: {
+                                iceServers: iceServers
+                            }
+                        }
+                    };
+
+                    console.log('Calling invitation.accept() with options:', options);
+                    await incomingSession.accept(options);
+                    log('Call answered successfully', 'success');
+                    updateStatus('Call connected');
+
+                } catch (error) {
+                    console.error('Error in answerCall:', error);
+                    log('Error answering call: ' + error.message, 'error');
+                    updateStatus('Failed to answer: ' + error.message);
+                    hideIncomingCall();
+                }
+            }
+
+            // ==========================================
+            // REJECT CALL
+            // ==========================================
+            async function rejectCall() {
+                console.log('rejectCall() called');
+                
+                if (!incomingSession) {
+                    log('No incoming session to reject', 'error');
+                    return;
+                }
+
+                try {
+                    log('Rejecting incoming call...', 'warning');
+                    await incomingSession.reject();
+                    hideIncomingCall();
+                    incomingSession = null;
+                    currentSession = null;
+                    updateStatus('Call rejected');
+                } catch (error) {
+                    console.error('Error in rejectCall:', error);
+                    log('Error rejecting call: ' + error.message, 'error');
+                    hideIncomingCall();
+                }
+            }
+
+            // ==========================================
+            // OUTGOING CALL
+            // ==========================================
+            async function makeCall() {
+                const callTarget = document.getElementById('callTarget').value;
+
+                if (!callTarget) {
+                    updateStatus('Please enter a SIP URI to call');
+                    return;
+                }
+
+                if (!userAgent) {
+                    updateStatus('Not registered. Please register first.');
+                    return;
+                }
+
+                try {
+                    const target = SIP.UserAgent.makeURI(callTarget);
+                    if (!target) {
+                        updateStatus('Invalid SIP URI');
+                        return;
+                    }
+
+                    log('Initiating outgoing call to: ' + callTarget);
+                    updateStatus('Calling ' + callTarget + '...');
+
+                    const iceServers = getIceServers();
+
+                    const inviter = new SIP.Inviter(userAgent, target, {
+                        sessionDescriptionHandlerOptions: {
+                            constraints: { audio: true, video: false },
+                            peerConnectionConfiguration: {
+                                iceServers: iceServers
+                            }
+                        }
+                    });
+
+                    currentSession = inviter;
+
+                    inviter.stateChange.addListener((state) => {
+                        log('Outgoing session state: ' + state);
+                        
+                        switch (state) {
+                            case SIP.SessionState.Establishing:
+                                updateStatus('Calling...');
+                                break;
+                            case SIP.SessionState.Established:
+                                log('Call connected!', 'success');
+                                updateStatus('Call connected');
+                                showActiveCall(callTarget, 'Outgoing Call');
+                                setupRemoteMedia(inviter);
+                                startCallTimer();
+                                break;
+                            case SIP.SessionState.Terminated:
+                                log('Call ended');
+                                updateStatus('Call ended');
+                                hideActiveCall();
+                                stopCallTimer();
+                                cleanupMedia();
+                                currentSession = null;
+                                break;
+                        }
+                    });
+
+                    inviter.delegate = {
+                        onBye: (bye) => {
+                            log('Remote party ended call', 'warning');
+                        }
+                    };
+
+                    await inviter.invite({
+                        requestDelegate: {
+                            onTrying: (response) => {
+                                log('Received 100 Trying');
+                            },
+                            onProgress: (response) => {
+                                log('Call progress: ' + response.message.statusCode + ' ' + response.message.reasonPhrase);
+                                if (response.message.statusCode === 180 || response.message.statusCode === 183) {
+                                    updateStatus('Ringing...');
+                                }
+                            },
+                            onAccept: (response) => {
+                                log('Call accepted: ' + response.message.statusCode, 'success');
+                            },
+                            onReject: (response) => {
+                                log('Call rejected: ' + response.message.statusCode + ' ' + response.message.reasonPhrase, 'error');
+                                updateStatus('Call rejected: ' + response.message.reasonPhrase);
+                                hideActiveCall();
+                            }
+                        }
+                    });
+
+                    hangupButton.disabled = false;
+
+                } catch (error) {
+                    log('Error making call: ' + error.message, 'error');
+                    updateStatus('Call failed: ' + error.message);
+                }
+            }
+
+            // ==========================================
+            // MEDIA HANDLING
+            // ==========================================
+            function setupRemoteMedia(session) {
+                try {
+                    const sdh = session.sessionDescriptionHandler;
+                    if (!sdh) {
+                        log('No session description handler', 'error');
+                        return;
+                    }
+
+                    const pc = sdh.peerConnection;
+                    if (!pc) {
+                        log('No peer connection', 'error');
+                        return;
+                    }
+
+                    log('Setting up remote media...');
+                    
+                    const remoteStream = new MediaStream();
+                    
+                    pc.getReceivers().forEach(receiver => {
+                        if (receiver.track) {
+                            log('Adding remote track: ' + receiver.track.kind);
+                            remoteStream.addTrack(receiver.track);
+                        }
+                    });
+
+                    if (remoteStream.getTracks().length > 0) {
+                        remoteAudio.srcObject = remoteStream;
+                        remoteAudio.play()
+                            .then(() => log('Audio playback started', 'success'))
+                            .catch(e => log('Audio playback error: ' + e.message, 'error'));
+                    } else {
+                        log('No remote tracks yet, waiting for ontrack...', 'warning');
+                        
+                        pc.ontrack = (event) => {
+                            log('Track received via ontrack: ' + event.track.kind);
+                            remoteStream.addTrack(event.track);
+                            remoteAudio.srcObject = remoteStream;
+                            remoteAudio.play().catch(e => log('Audio error: ' + e.message, 'error'));
+                        };
+                    }
+
+                    log('Remote media setup complete', 'success');
+
+                } catch (error) {
+                    log('Error setting up remote media: ' + error.message, 'error');
+                }
+            }
+
+            function cleanupMedia() {
+                if (remoteAudio.srcObject) {
+                    remoteAudio.srcObject.getTracks().forEach(track => {
+                        track.stop();
+                    });
+                    remoteAudio.srcObject = null;
+                }
+            }
+
+            // ==========================================
+            // CALL TIMER
+            // ==========================================
+            function startCallTimer() {
+                callStartTime = new Date();
+                callTimerInterval = setInterval(updateCallTimer, 1000);
+            }
+
+            function stopCallTimer() {
+                if (callTimerInterval) {
+                    clearInterval(callTimerInterval);
+                    callTimerInterval = null;
+                }
+                document.getElementById('callTimer').textContent = '00:00';
+            }
+
+            function updateCallTimer() {
+                if (!callStartTime) return;
+                
+                const elapsed = Math.floor((new Date() - callStartTime) / 1000);
+                const minutes = Math.floor(elapsed / 60).toString().padStart(2, '0');
+                const seconds = (elapsed % 60).toString().padStart(2, '0');
+                document.getElementById('callTimer').textContent = `${minutes}:${seconds}`;
+            }
+
+            // Make functions globally accessible
+            window.answerCall = answerCall;
+            window.rejectCall = rejectCall;
+            window.hangUp = hangUp;
+
+            // ==========================================
+            // HANGUP
+            // ==========================================
+            async function hangUp() {
+                console.log('hangUp() called');
+                
+                if (!currentSession) {
+                    log('No active session to hang up', 'warning');
+                    return;
+                }
+
+                try {
+                    log('Hanging up...');
+                    
+                    const state = currentSession.state;
+                    console.log('Current session state:', state);
+                    
+                    if (state === SIP.SessionState.Established) {
+                        await currentSession.bye();
+                    } else if (state === SIP.SessionState.Establishing) {
+                        await currentSession.cancel();
+                    } else if (state === SIP.SessionState.Initial && incomingSession) {
+                        await incomingSession.reject();
+                    }
+                    
+                    updateStatus('Call ended');
+                    
+                } catch (error) {
+                    console.error('Hangup error:', error);
+                    log('Hangup error: ' + error.message, 'error');
+                }
+
+                hideActiveCall();
+                hideIncomingCall();
+                stopCallTimer();
+                cleanupMedia();
+                currentSession = null;
+                incomingSession = null;
+            }
+
+            // Cleanup on page unload
+            window.addEventListener('beforeunload', async () => {
+                if (currentSession && currentSession.state !== SIP.SessionState.Terminated) {
+                    try { await currentSession.bye(); } catch (e) {}
+                }
+                if (registerer) {
+                    try { await registerer.unregister(); } catch (e) {}
+                }
+                if (userAgent) {
+                    try { await userAgent.stop(); } catch (e) {}
+                }
+            });
+        });
+
+        // ==========================================
+        // GLOBAL FUNCTIONS FOR DTMF, MUTE, HOLD
+        // ==========================================
+        function sendDTMF(digit) {
+            if (!currentSession || currentSession.state !== SIP.SessionState.Established) {
+                console.log('Cannot send DTMF - no active call');
+                return;
+            }
+
+            try {
+                const options = {
+                    requestOptions: {
+                        body: {
+                            contentDisposition: 'render',
+                            contentType: 'application/dtmf-relay',
+                            content: `Signal=${digit}\r\nDuration=100`
+                        }
+                    }
+                };
+                
+                currentSession.info(options)
+                    .then(() => console.log('DTMF sent: ' + digit))
+                    .catch(e => console.error('DTMF error:', e));
+                    
+            } catch (error) {
+                console.error('DTMF error:', error);
+            }
+        }
+
+        function toggleMute() {
+            if (!currentSession) return;
+
+            try {
+                const sdh = currentSession.sessionDescriptionHandler;
+                const pc = sdh.peerConnection;
+                
+                pc.getSenders().forEach(sender => {
+                    if (sender.track && sender.track.kind === 'audio') {
+                        sender.track.enabled = isMuted;
+                    }
+                });
+                
+                isMuted = !isMuted;
+                document.getElementById('muteButton').textContent = isMuted ? '🔊 Unmute' : '🔇 Mute';
+                console.log(isMuted ? 'Muted' : 'Unmuted');
+                
+            } catch (error) {
+                console.error('Mute error:', error);
+            }
+        }
+
+        function toggleHold() {
+            if (!currentSession) return;
+
+            try {
+                const sdh = currentSession.sessionDescriptionHandler;
+                const pc = sdh.peerConnection;
+                
+                pc.getSenders().forEach(sender => {
+                    if (sender.track) {
+                        sender.track.enabled = isOnHold;
+                    }
+                });
+                
+                isOnHold = !isOnHold;
+                document.getElementById('holdButton').textContent = isOnHold ? '▶️ Resume' : '⏸️ Hold';
+                console.log(isOnHold ? 'On hold' : 'Resumed');
+                
+            } catch (error) {
+                console.error('Hold error:', error);
+            }
+        }
+    </script>
+</body>
+</html>
